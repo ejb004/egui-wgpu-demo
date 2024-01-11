@@ -4,7 +4,7 @@
 <h3>**To run:**</h3>
 run _cargo run _ from the root folder
 <br></br>
-_crate versions:_
+<i>crate versions:</i></br>
 egui: 0.25.0
 wgpu: 0.18.0
 winit: 0.29.7 with rwh_05 feature
