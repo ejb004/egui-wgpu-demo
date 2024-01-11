@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+
 winit = { version = "0.29.7", features = ["rwh_05"] }
-egui = "0.24.1"
-egui-wgpu = "0.24.1"
+egui-wgpu = "0.25.0"
 pollster = "0.3.0"
 wgpu = "0.18.0"
 env_logger = "0.10.1"
@@ -16,7 +17,7 @@ bytemuck = { version = "1.14", features = ["derive"] }
 anyhow = "1.0.77"
 cfg-if = "1.0.0"
 log = "0.4.20"
-
-
+egui-winit = "0.25.0"
+egui = "0.25.0"
 [profile.dev]
-opt-level = 3
+opt-level = 1

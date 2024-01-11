@@ -1,9 +1,16 @@
+mod gui;
+mod gui_example;
+
 use std::iter;
 
+use egui_wgpu::renderer::ScreenDescriptor;
+use gui::EguiRenderer;
+use gui_example::GUI;
 use wgpu::util::DeviceExt;
+use wgpu::TextureViewDescriptor;
 use winit::{
     event::*,
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     window::{Window, WindowBuilder},
 };
@@ -68,6 +75,7 @@ struct State {
     index_buffer: wgpu::Buffer,
     num_indices: u32,
     window: Window,
+    egui: gui::EguiRenderer,
 }
 
 impl State {
@@ -203,6 +211,15 @@ impl State {
         });
         let num_indices = INDICES.len() as u32;
 
+        // ...
+        let mut egui = EguiRenderer::new(
+            &device,       // wgpu Device
+            config.format, // TextureFormat
+            None,          // this can be None
+            1,             // samples
+            &window,       // winit Window
+        );
+
         Self {
             surface,
             device,
@@ -214,6 +231,7 @@ impl State {
             index_buffer,
             num_indices,
             window,
+            egui,
         }
     }
 
@@ -240,9 +258,16 @@ impl State {
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let view = output.texture.create_view(&TextureViewDescriptor {
+            label: None,
+            format: None,
+            dimension: None,
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
+        });
 
         let mut encoder = self
             .device
@@ -276,6 +301,21 @@ impl State {
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         }
+
+        let screen_descriptor = ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: self.window().scale_factor() as f32,
+        };
+
+        self.egui.draw(
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            &self.window,
+            &view,
+            screen_descriptor,
+            |ui| GUI(ui),
+        );
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
@@ -341,6 +381,7 @@ pub async fn run() {
                     }
                     WindowEvent::RedrawRequested => {
                         state.update();
+
                         match state.render() {
                             Ok(_) => {}
                             // Reconfigure the surface if it's lost or outdated
@@ -353,8 +394,10 @@ pub async fn run() {
                             Err(wgpu::SurfaceError::Timeout) => log::warn!("Surface timeout"),
                         }
                     }
+
                     _ => {}
-                }
+                };
+                state.egui.handle_input(&mut state.window, &event);
             }
         }
         _ => {}
