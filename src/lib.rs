@@ -3,17 +3,19 @@ mod gui_example;
 
 use std::iter;
 
-use egui_wgpu::renderer::ScreenDescriptor;
+use egui_wgpu::ScreenDescriptor;
 use gui::EguiRenderer;
 use gui_example::GUI;
-use wgpu::util::DeviceExt;
-use wgpu::TextureViewDescriptor;
-use winit::{
+use egui_wgpu::wgpu;
+use egui_wgpu::wgpu::util::DeviceExt;
+use egui_wgpu::wgpu::TextureViewDescriptor;
+use egui_winit::winit::{
     event::*,
     event_loop::EventLoop,
     keyboard::{Key, NamedKey},
     window::{Window, WindowBuilder},
 };
+use egui_winit::winit;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -63,8 +65,8 @@ const VERTICES: &[Vertex] = &[
 
 const INDICES: &[u16] = &[0, 1, 2];
 
-struct State {
-    surface: wgpu::Surface,
+struct State<'a> {
+    surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -74,12 +76,12 @@ struct State {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     num_indices: u32,
-    window: Window,
-    egui: gui::EguiRenderer,
+    window: &'a Window,
+    egui: EguiRenderer,
 }
 
-impl State {
-    async fn new(window: Window) -> Self {
+impl<'a> State<'a> {
+    async fn new(window: &'a Window) -> Self {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -88,12 +90,8 @@ impl State {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
-
-        // # Safety
-        //
-        // The surface needs to live as long as the window that created it.
-        // State owns the window so this should be safe.
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+        
+        let surface = instance.create_surface(window).unwrap();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -108,10 +106,10 @@ impl State {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::empty(),
                     // WebGL doesn't support all of wgpu's features, so if
                     // we're building for the web we'll have to disable some.
-                    limits: if cfg!(target_arch = "wasm32") {
+                    required_limits: if cfg!(target_arch = "wasm32") {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
                         wgpu::Limits::default()
@@ -140,6 +138,7 @@ impl State {
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
@@ -217,7 +216,7 @@ impl State {
             config.format, // TextureFormat
             None,          // this can be None
             1,             // samples
-            &window,       // winit Window
+            window,       // winit Window
         );
 
         Self {
@@ -358,7 +357,7 @@ pub async fn run() {
     }
 
     // State::new uses async code, so we're going to wait for it to finish
-    let mut state = State::new(window).await;
+    let mut state = State::new(&window).await;
 
     let _ = event_loop.run(move |event, ewlt| match event {
         Event::WindowEvent {
